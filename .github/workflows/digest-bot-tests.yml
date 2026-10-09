@@ -1,0 +1,27 @@
+name: digest-bot tests
+
+on:
+  push:
+    paths: ["discord-digest-bot/**", ".github/workflows/digest-bot-tests.yml"]
+  pull_request:
+    paths: ["discord-digest-bot/**", ".github/workflows/digest-bot-tests.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    defaults:
+      run:
+        working-directory: discord-digest-bot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: discord-digest-bot/requirements*.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt pyflakes
+      - run: python -m pyflakes *.py tests/*.py
+      - run: python -m pytest -q

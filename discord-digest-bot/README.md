@@ -47,25 +47,36 @@ cp .env.example .env             # then edit .env
 | `MAX_ARTICLE_AGE_HOURS` | no | `36` | Skip older articles |
 | `DB_PATH` | no | `./digest.db` | SQLite file |
 
-## 4. Run
+## 4. Check, then run
 
 ```bash
+python check.py            # verifies token, channel, permissions, NewsAPI key and every feed
+python check.py --preview  # same, plus prints the digest it would post right now (nothing is posted)
 python bot.py
 ```
 
-On startup the bot logs the next scheduled run and syncs slash commands to the server that owns `DISCORD_CHANNEL_ID`, so they appear right away. Use `/digest` once to check that everything works.
+`check.py` exits with code 1 and a ❌ line for anything that would stop the bot from working, such as a rejected token, a wrong channel ID, a missing *Send Messages* or *Embed Links* permission, or no reachable sources. A single failing feed is only a ⚠️ warning, because the bot skips it at runtime.
+
+On startup the bot logs the next scheduled run and syncs slash commands to the server that owns `DISCORD_CHANNEL_ID`, so they appear right away.
 
 The process must run continuously for the 08:00 post to happen. A laptop that sleeps will miss posts. If the bot was down at 08:00 but comes back within an hour, it still posts that day's digest.
 
-### Run with Docker (recommended for a server or VPS)
+### Deploy on a Linux server (recommended)
+
+On a fresh Ubuntu/Debian VPS (the cheapest plan is plenty: the bot uses roughly 100 MB of RAM):
 
 ```bash
-cp .env.example .env    # fill it in
-docker compose up -d --build
-docker compose logs -f  # check for "Synced N slash commands" and "Source X failed" warnings
+git clone <this repo> && cd <repo>/discord-digest-bot
+./deploy.sh      # 1st run: installs Docker if needed, creates .env, then stops
+nano .env        # fill in DISCORD_TOKEN, DISCORD_CHANNEL_ID, NEWSAPI_KEY
+./deploy.sh      # builds, runs check.py, and starts the bot only if the check passes
 ```
 
-The SQLite database is stored on the `digest-data` volume, so rebuilding the container keeps your seen articles and custom feeds. The bot restarts automatically after a crash or reboot. With a wrong token it restarts in a loop, so check the logs after the first start.
+To update later, run `git pull && ./deploy.sh`. To follow the logs, run `docker compose logs -f`.
+
+The SQLite database lives on the `digest-data` Docker volume, so rebuilds keep your seen articles and custom feeds. The container restarts automatically after a crash or reboot.
+
+If the repository is private, the server needs access to clone it (a GitHub deploy key or a personal access token).
 
 ## Tests
 
@@ -74,7 +85,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-The tests run offline against a local test server. They cover parsing, dedup, categorisation, timeouts and failing sources, the SQLite store, and Discord embed size limits.
+The tests run offline: feeds, NewsAPI and the Discord REST API are simulated by local test servers. They cover parsing, dedup, categorisation, timeouts and failing sources, the SQLite store, Discord embed size limits, and every `check.py` failure mode. GitHub Actions runs them on Python 3.10 and 3.12 for every push that touches this folder.
 
 ## Slash commands
 
@@ -96,6 +107,8 @@ bot.py        bot setup, APScheduler job, slash commands, embed rendering
 fetcher.py    RSS + NewsAPI fetching, categorisation, dedup, selection
 database.py   SQLite: seen article URLs (kept 30 days) + custom feeds
 config.py     .env loading, constants, default feeds, category keywords
+check.py      preflight check + digest preview (posts nothing)
+deploy.sh     Docker install/build/check/start for a Linux server
 ```
 
 ## Tuning

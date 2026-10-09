@@ -64,7 +64,7 @@ def build_embeds(digest: dict[str, list[fetcher.Article]]) -> list[discord.Embed
                 color=config.CATEGORY_COLORS[category],
             )
         )
-    embeds[-1].set_footer(text="Sources: TechCrunch, The Verge, Ars Technica, Hacker News, Wired, NewsAPI + custom feeds")
+    embeds[-1].set_footer(text="Use /sources to see where these stories come from")
     return embeds
 
 
@@ -119,14 +119,20 @@ class DigestBot(discord.Client):
             return
         self._synced = True
         channel = await self._get_digest_channel()
-        if channel is not None and getattr(channel, "guild", None):
-            # Guild sync is instant; global sync can take up to an hour to show up.
-            self.tree.copy_global_to(guild=channel.guild)
-            cmds = await self.tree.sync(guild=channel.guild)
-            log.info("Synced %d slash commands to guild %s", len(cmds), channel.guild.name)
-        else:
-            cmds = await self.tree.sync()
-            log.info("Synced %d slash commands globally (may take up to 1h to appear)", len(cmds))
+        try:
+            if channel is not None and getattr(channel, "guild", None):
+                # Guild sync is instant; global sync can take up to an hour to show up.
+                self.tree.copy_global_to(guild=channel.guild)
+                cmds = await self.tree.sync(guild=channel.guild)
+                log.info("Synced %d slash commands to guild %s", len(cmds), channel.guild.name)
+            else:
+                cmds = await self.tree.sync()
+                log.info("Synced %d slash commands globally (may take up to 1h to appear)", len(cmds))
+        except discord.Forbidden:
+            log.error("Could not register slash commands: re-invite the bot with the "
+                      "'applications.commands' scope (see README). Scheduled digests still work.")
+        except discord.HTTPException as e:
+            log.error("Slash command sync failed: %s", e)
 
     async def close(self) -> None:
         if self.scheduler.running:

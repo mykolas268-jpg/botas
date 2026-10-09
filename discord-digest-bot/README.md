@@ -55,7 +55,26 @@ python bot.py
 
 On startup the bot logs the next scheduled run and syncs slash commands to the server that owns `DISCORD_CHANNEL_ID`, so they appear right away. Use `/digest` once to check that everything works.
 
-The process must run continuously for the 08:00 post to happen. Run it under systemd, Docker, pm2, or a small VPS. A laptop that sleeps will miss posts. If the bot was down at 08:00 but comes back within an hour, it still posts that day's digest.
+The process must run continuously for the 08:00 post to happen. A laptop that sleeps will miss posts. If the bot was down at 08:00 but comes back within an hour, it still posts that day's digest.
+
+### Run with Docker (recommended for a server or VPS)
+
+```bash
+cp .env.example .env    # fill it in
+docker compose up -d --build
+docker compose logs -f  # check for "Synced N slash commands" and "Source X failed" warnings
+```
+
+The SQLite database is stored on the `digest-data` volume, so rebuilding the container keeps your seen articles and custom feeds. The bot restarts automatically after a crash or reboot. With a wrong token it restarts in a loop, so check the logs after the first start.
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The tests run offline against a local test server. They cover parsing, dedup, categorisation, timeouts and failing sources, the SQLite store, and Discord embed size limits.
 
 ## Slash commands
 

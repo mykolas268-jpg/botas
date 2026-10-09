@@ -22,6 +22,7 @@ log = logging.getLogger("digest.bot")
 
 EMBED_DESC_LIMIT = 4096
 MAX_EMBEDS_PER_MESSAGE = 10
+MAX_EMBED_CHARS_PER_MESSAGE = 6000  # Discord limit on the combined size of a message's embeds
 
 
 # --- Embed building ----------------------------------------------------------
@@ -65,6 +66,23 @@ def build_embeds(digest: dict[str, list[fetcher.Article]]) -> list[discord.Embed
         )
     embeds[-1].set_footer(text="Sources: TechCrunch, The Verge, Ars Technica, Hacker News, Wired, NewsAPI + custom feeds")
     return embeds
+
+
+def chunk_embeds(embeds: list[discord.Embed]) -> list[list[discord.Embed]]:
+    """Split embeds into groups that each fit in one message (count + total size limits)."""
+    chunks: list[list[discord.Embed]] = []
+    current: list[discord.Embed] = []
+    size = 0
+    for embed in embeds:
+        if current and (size + len(embed) > MAX_EMBED_CHARS_PER_MESSAGE
+                        or len(current) == MAX_EMBEDS_PER_MESSAGE):
+            chunks.append(current)
+            current, size = [], 0
+        current.append(embed)
+        size += len(embed)
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 NO_NEWS_MESSAGE = "📭 No new tech/business stories today — every source was empty, failed, or already covered."
@@ -149,7 +167,8 @@ class DigestBot(discord.Client):
                 if embeds is None:
                     await channel.send(NO_NEWS_MESSAGE)
                 else:
-                    await channel.send(embeds=embeds[:MAX_EMBEDS_PER_MESSAGE])
+                    for chunk in chunk_embeds(embeds):
+                        await channel.send(embeds=chunk)
                     self.db.mark_seen(seen)
                 pruned = self.db.prune_seen(config.SEEN_RETENTION_DAYS)
                 log.info("Scheduled digest posted (%d URLs marked seen, %d old URLs pruned)", len(seen), pruned)
@@ -169,7 +188,8 @@ async def digest_cmd(interaction: discord.Interaction):
         if embeds is None:
             await interaction.followup.send(NO_NEWS_MESSAGE)
             return
-        await interaction.followup.send(embeds=embeds[:MAX_EMBEDS_PER_MESSAGE])
+        for chunk in chunk_embeds(embeds):
+            await interaction.followup.send(embeds=chunk)
         bot.db.mark_seen(seen)
 
 

@@ -61,6 +61,23 @@ On startup the bot logs the next scheduled run and syncs slash commands to the s
 
 The process must run continuously for the 08:00 post to happen. A laptop that sleeps will miss posts. If the bot was down at 08:00 but comes back within an hour, it still posts that day's digest.
 
+### Free hosting with GitHub Actions (no server, no slash commands)
+
+`.github/workflows/daily-digest.yml` runs `run_once.py` on GitHub's machines every morning. It posts the digest and exits.
+
+1. In the repository on GitHub, go to **Settings → Secrets and variables → Actions → New repository secret** and add:
+   - `DISCORD_TOKEN`: the bot token
+   - `DISCORD_CHANNEL_ID`: the channel ID
+   - `NEWSAPI_KEY` (optional)
+2. To test, go to **Actions → daily digest → Run workflow**. It posts immediately.
+
+How it behaves:
+- **Timing:** GitHub cron runs in UTC and often starts late, so the workflow fires at 05:03, 06:03 and 07:03 UTC. It posts on the first run at or after 08:00 Vilnius time (summer or winter) and skips the rest. Expect the post between about 08:03 and 08:30. If you change `DIGEST_HOUR` or `TIMEZONE`, edit the cron hours too.
+- **Memory between days:** posted URLs are kept in the Actions cache. If GitHub evicts the cache, the worst case is that the day's stories get reposted once.
+- **Slash commands don't work** in this mode, because nothing is running between posts. Add extra feeds in `DEFAULT_RSS_FEEDS` in `config.py`.
+- **Inactivity:** GitHub turns off scheduled workflows in public repos after 60 days with no commits. It emails you first, and **Actions → daily digest → Enable workflow** turns it back on.
+- **Failures:** a failed run shows red in the Actions tab, and GitHub emails you.
+
 ### Deploy on a Linux server (recommended)
 
 On a fresh Ubuntu/Debian VPS (the cheapest plan is plenty: the bot uses roughly 100 MB of RAM):
@@ -108,6 +125,7 @@ fetcher.py    RSS + NewsAPI fetching, categorisation, dedup, selection
 database.py   SQLite: seen article URLs (kept 30 days) + custom feeds
 config.py     .env loading, constants, default feeds, category keywords
 check.py      preflight check + digest preview (posts nothing)
+run_once.py   post once and exit (used by the GitHub Actions schedule)
 deploy.sh     Docker install/build/check/start for a Linux server
 ```
 

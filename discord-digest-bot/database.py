@@ -37,6 +37,10 @@ class Database:
                 title     TEXT,
                 posted_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            );
             CREATE TABLE IF NOT EXISTS custom_feeds (
                 name     TEXT PRIMARY KEY COLLATE NOCASE,
                 url      TEXT NOT NULL,
@@ -97,6 +101,15 @@ class Database:
     def list_feeds(self) -> list[dict]:
         rows = self.conn.execute("SELECT name, url FROM custom_feeds ORDER BY name").fetchall()
         return [dict(r) for r in rows]
+
+    # --- small key/value store ---------------------------------------------
+    def get_meta(self, key: str) -> str | None:
+        row = self.conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, value))
+        self.conn.commit()
 
     def close(self) -> None:
         self.conn.close()

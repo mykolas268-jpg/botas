@@ -85,6 +85,16 @@ def chunk_embeds(embeds: list[discord.Embed]) -> list[list[discord.Embed]]:
     return chunks
 
 
+def seen_entries(digest: dict[str, list[fetcher.Article]]) -> list[tuple[str, str]]:
+    """(url, title) pairs to mark as posted: each story plus the duplicates it replaced."""
+    return [
+        (url, a.title)
+        for arts in digest.values()
+        for a in arts
+        for url in (a.url, *a.duplicate_urls)
+    ]
+
+
 NO_NEWS_MESSAGE = "📭 No new tech/business stories today — every source was empty, failed, or already covered."
 
 
@@ -155,13 +165,7 @@ class DigestBot(discord.Client):
         digest = await fetcher.build_digest(self.db)
         if not digest:
             return None, []
-        seen = [
-            (url, a.title)
-            for arts in digest.values()
-            for a in arts
-            for url in (a.url, *a.duplicate_urls)
-        ]
-        return build_embeds(digest), seen
+        return build_embeds(digest), seen_entries(digest)
 
     async def scheduled_digest(self) -> None:
         try:

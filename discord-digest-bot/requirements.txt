@@ -1,0 +1,5 @@
+discord.py>=2.4,<3
+feedparser>=6.0,<7
+aiohttp>=3.9,<4
+python-dotenv>=1.0,<2
+APScheduler>=3.10,<4
